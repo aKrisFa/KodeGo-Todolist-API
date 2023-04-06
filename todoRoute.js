@@ -1,36 +1,90 @@
 const router = require("express").Router();
+const _ = require('lodash');
+
 if (typeof localStorage === "undefined" || localStorage === null) {
-    var LocalStorage = require('node-localstorage').LocalStorage;
-    localStorage = new LocalStorage('./scratch');
-    localStorage.setItem('tasks', '');
+  var LocalStorage = require('node-localstorage').LocalStorage;
+  localStorage = new LocalStorage('./scratch');
+  // reset localStorage
+  // localStorage.setItem('tasks', '');
+}
+
+router.get('/list', (request, response) => {
+  const tasks = localStorage.getItem('tasks') ? JSON.parse(localStorage.getItem('tasks')) : [];
+
+  return response.json({
+    tasks: tasks,
+  });
+});
+
+router.patch('/mark-as-done/:id', function (request, response) {
+  const id = parseInt(request.params.id); // use parseInt to exactly match id from currentTasks using _.find()
+
+  // first extraction, extract collection of tasks from localStorage
+  const currentTasks = localStorage.getItem('tasks') ? JSON.parse(localStorage.getItem('tasks')) : [];
+
+  // second extraction, use _.find() with {'id': id} as second parameter
+  const taskToUpdate = _.find(currentTasks, {'id': id});
+
+  // new key: done, set to 1
+  taskToUpdate.done = 1;
+
+  // remove found task from collection
+  _.remove(currentTasks, function (task) {
+    return task.id === id;
+  });
+
+  // push updated task to collection
+  currentTasks.push(taskToUpdate);
+
+  // sort whole collection by id
+  const sorted = _.sortBy(currentTasks, ['id']);
+
+  localStorage.setItem('tasks', JSON.stringify(sorted));
+
+  return response.json({
+    type: 'success',
+    task: taskToUpdate
+  });
+});
+
+router.post('/create', (request, response) => {
+  // get task content from payload (html form)
+  const task = request.body.task;
+
+  // get current tasks from localStorage
+  const currentTasks = localStorage.getItem('tasks') ? JSON.parse(localStorage.getItem('tasks')) : [];
+  let newTask;
+
+  if (currentTasks.length === 0) {
+    newTask = {
+      'id': 1,
+      'content': task,
+    };
+  }
+  // else if (currentTasks.length === 5) {
+  //   return response.json({
+  //     type: 'error',
+  //     message: "Tasks list is full!"
+  //   });
+  // } 
+  else {
+    const lastRecord = currentTasks[currentTasks.length - 1];
+    const newId = parseInt(lastRecord.id) + 1;
+
+    newTask = {
+      'id': newId,
+      'content': task,
+    };
   }
 
+  currentTasks.push(newTask);
 
-  router.post('/create', (request, response) => {
-    
-    // create to do task
+  localStorage.setItem('tasks', JSON.stringify(currentTasks));
 
-    const todoList = request.body.task;
-
-    const tasks = localStorage.getItem('tasks');
-    // task1|task2|task3
-    // ['task1', 'task2', 'task3']
-    const tasksArray = tasks.split('|');
-
-    tasksArray.push(todoList);
-
-    localStorage.setItem('tasks', tasksArray.join('|'));
-
-    return response.json({
-        tasks: tasksArray,
-    });
-
-
-    // return response.json({
-    //     Shuffled: false,
-    //     Remaining: deck.length,
-    //     Cards: deck,
-    // });
+  return response.json({
+      type: 'success',
+      tasks: currentTasks,
+  });
 });
 
 module.exports = router;
