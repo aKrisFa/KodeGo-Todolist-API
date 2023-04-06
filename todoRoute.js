@@ -47,6 +47,64 @@ router.patch('/mark-as-done/:id', function (request, response) {
   });
 });
 
+router.patch('/update/:id', function (request, response) {
+  const id = parseInt(request.params.id); // use parseInt to exactly match id from currentTasks using _.find()
+  const updatedContent = request.body.content;
+
+  // first extraction, extract collection of tasks from localStorage
+  const currentTasks = localStorage.getItem('tasks') ? JSON.parse(localStorage.getItem('tasks')) : [];
+
+  // second extraction, use _.find() with {'id': id} as second parameter
+  const taskToUpdate = _.find(currentTasks, {'id': id});
+
+  if (taskToUpdate == undefined) {
+    return response.json({
+      type: 'error',
+      message: `Task #${id} does not exist!`
+    });
+  }
+
+  // update content, set to updatedContent (request.body.content from frontend)
+  taskToUpdate.content = updatedContent;
+
+  // remove found task from collection
+  _.remove(currentTasks, function (task) {
+    return task.id === id;
+  });
+
+  // push updated task to collection
+  currentTasks.push(taskToUpdate);
+
+  // sort whole collection by id
+  const sorted = _.sortBy(currentTasks, ['id']);
+
+  localStorage.setItem('tasks', JSON.stringify(sorted));
+
+  return response.json({
+    type: 'success',
+    task: taskToUpdate
+  });
+});
+
+router.delete('/delete/:id', function (request, response) {
+  const id = parseInt(request.params.id); // use parseInt to exactly match id from currentTasks using _.find()
+
+  // first extraction, extract collection of tasks from localStorage
+  const currentTasks = localStorage.getItem('tasks') ? JSON.parse(localStorage.getItem('tasks')) : [];
+
+  // remove found task from collection
+  _.remove(currentTasks, function (task) {
+    return task.id === id;
+  });
+
+  localStorage.setItem('tasks', JSON.stringify(currentTasks));
+
+  return response.json({
+    type: 'success',
+    message: `Task #${id} deleted`
+  });
+});
+
 router.post('/create', (request, response) => {
   // get task content from payload (html form)
   const task = request.body.task;
